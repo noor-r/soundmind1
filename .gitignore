@@ -1,0 +1,10 @@
+.env
+.venv/
+.tmp/
+.cache/
+node_modules/
+__pycache__/
+*.py[cod]
+downloader/YoutubeDownloader-prime/**/bin/
+downloader/YoutubeDownloader-prime/**/obj/
+downloader/YoutubeDownloader-prime/tmp-download/

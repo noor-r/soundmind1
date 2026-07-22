@@ -1,0 +1,22 @@
+{
+  "name": "soundmind1",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js",
+    "build:downloader": "dotnet build downloader/YoutubeDownloader-prime/SoundMind.Downloader/SoundMind.Downloader.csproj --nologo",
+    "test": "npm run check && npm run build:downloader"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "multer": "^2.2.0",
+    "node-fetch": "^2.7.0"
+  }
+}

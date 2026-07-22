@@ -1,0 +1,15 @@
+# User-specific files
+.vs/
+.idea/
+*.suo
+*.user
+
+# Build results
+bin/
+obj/
+
+# Avalonia
+.avalonia-build-tasks/
+
+# Test results
+TestResults/

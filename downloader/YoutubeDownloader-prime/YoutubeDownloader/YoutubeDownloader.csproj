@@ -1,0 +1,78 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <ApplicationIcon>../favicon.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Trimmed builds break support for Windows 10 for some reason -->
+    <!-- https://github.com/Tyrrrz/YoutubeDownloader/issues/496 -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PublishMacOSBundle>false</PublishMacOSBundle>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <EncryptionSalt>HimalayanPinkSalt</EncryptionSalt>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Expose this property in code -->
+    <ProjectProperty Include="EncryptionSalt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="../favicon.ico" Link="favicon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AsyncImageLoader.Avalonia" />
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Cogwheel" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="CSharpier.MsBuild" PrivateAssets="all" />
+    <PackageReference Include="Deorcify" />
+    <PackageReference Include="DialogHost.Avalonia" />
+    <PackageReference Include="Gress" />
+    <PackageReference Include="Markdig" />
+    <PackageReference Include="Material.Avalonia" />
+    <PackageReference Include="Material.Avalonia.DataGrid" />
+    <PackageReference Include="Material.Icons.Avalonia" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Onova" />
+    <PackageReference Include="PowerKit" />
+    <PackageReference Include="ThisAssembly.Project" PrivateAssets="all" />
+    <PackageReference Include="WebView.Avalonia" />
+    <PackageReference Include="WebView.Avalonia.Desktop" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../YoutubeDownloader.Core/YoutubeDownloader.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Avalonia.WebView is completely incompatible with trimming -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="Avalonia.WebView" />
+    <TrimmerRootAssembly Include="Avalonia.WebView.Desktop" />
+    <TrimmerRootAssembly Include="Avalonia.WebView.Linux" />
+    <TrimmerRootAssembly Include="Avalonia.WebView.MacCatalyst" />
+    <TrimmerRootAssembly Include="Avalonia.WebView.Windows" />
+    <TrimmerRootAssembly Include="AvaloniaWebView.Shared" />
+    <TrimmerRootAssembly Include="Linux.WebView.Core" />
+    <TrimmerRootAssembly Include="Microsoft.Web.WebView2.Core" />
+    <TrimmerRootAssembly Include="WebView.Avalonia" />
+    <TrimmerRootAssembly Include="WebView.Core" />
+  </ItemGroup>
+
+  <!-- Publish macOS bundle -->
+  <Target Name="PublishMacOSBundle" AfterTargets="Publish" Condition="$(PublishMacOSBundle)">
+    <Exec
+      Command="dotnet run --file &quot;$(ProjectDir)PublishMacOSBundle.csx&quot; -- --publish-dir &quot;$(PublishDir)&quot; --icons-file &quot;$(ProjectDir)../favicon.icns&quot; --full-version $(Version) --short-version $(AssemblyVersion)"
+      LogStandardErrorAsError="true"
+    />
+  </Target>
+</Project>
