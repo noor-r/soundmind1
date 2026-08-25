@@ -56,3 +56,5 @@ This app needs a long-running Node host with Python and .NET — not a static-on
 - `GET /api/health`: reports OpenAI, Python, downloader, and FFmpeg availability.
 
 Optional environment overrides are documented in `.env.example`.
+
+<img width="641" height="421" alt="image" src="https://github.com/user-attachments/assets/220af04b-86c3-4915-935e-a6ca2a7c3c9f" />
