@@ -10,293 +10,447 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#f4f1e9;--s1:#fffefa;--s2:#ebe7dc;
-  --b1:rgba(207,76,54,.34);--b2:rgba(24,35,33,.15);
-  --v:#cf4c36;--vd:rgba(207,76,54,.11);
-  --g:#a97518;--gd:rgba(169,117,24,.13);
-  --t:#147a72;--td:rgba(20,122,114,.12);
-  --p:#a43f65;
-  --tx:#182321;--ts:#4d5b57;--tm:#727d79;
-  --ink:#13201f;--paper:#f4f1e9;
-  --serif:'Fraunces',Georgia,serif;
-  --sans:'DM Sans',sans-serif;
+  --void:#0b0a10;--wood:#8a3b2e;--wood-deep:#3d1f14;--amber:#e8b04b;
+  --cream:#d9c9a3;--cream-strong:#f3e8ca;--cream-dim:rgba(217,201,163,.72);
+  --line:rgba(217,201,163,.17);--line-strong:rgba(232,176,75,.22);
+  --panel:rgba(255,255,255,.045);--panel-strong:rgba(255,255,255,.07);
+  --panel-soft:rgba(255,255,255,.03);--danger:#ff9b96;
+  --serif:'Fraunces',Georgia,serif;--sans:'DM Sans',sans-serif;
 }
 html{scroll-behavior:smooth;overflow-x:clip}
-body{font-family:var(--sans);background:var(--bg);color:var(--tx);min-height:100vh;font-size:14px;line-height:1.6}
+body{
+  font-family:var(--sans);background:var(--void);color:var(--cream);
+  min-height:100vh;font-size:14px;line-height:1.6;overflow-x:hidden;position:relative
+}
+a{color:inherit}
+button,input{font:inherit}
+main,nav,section,header,footer,#result,.loader,.err{position:relative;z-index:2}
 @keyframes spin{to{transform:rotate(360deg)}}
-@keyframes fade-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes fade-up{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
 .fade-up{animation:fade-up .5s ease both}
 
-nav{position:absolute;top:0;left:0;right:0;height:72px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(20px,5vw,72px);color:#fff;border-bottom:1px solid rgba(255,255,255,.22);z-index:100}
-.logo{font-family:var(--serif);font-size:23px;font-weight:500;color:#fff;text-decoration:none}
-.logo em{color:#f09a78;font-style:normal}
-.nav-links{display:flex;align-items:center;gap:28px}
-.nav-links a{font-size:12px;color:rgba(255,255,255,.78);text-decoration:none;transition:color .2s}
-.nav-links a:hover{color:#fff}
-.nav-cta{height:36px;padding:0 14px;border:1px solid rgba(255,255,255,.48);display:inline-flex!important;align-items:center;gap:7px;color:#fff!important}
+.stage-bg{
+  position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 18%, rgba(232,176,75,.10), transparent 60%),
+    radial-gradient(ellipse 80% 60% at 18% 82%, rgba(138,59,46,.18), transparent 65%),
+    radial-gradient(ellipse 80% 60% at 86% 70%, rgba(61,31,20,.35), transparent 65%),
+    var(--void)
+}
+.grain{
+  position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.035;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")
+}
+
+nav{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:28px 6vw;position:relative;z-index:10
+}
+.logo{
+  font-family:var(--serif);font-size:1.25rem;font-weight:500;
+  color:var(--cream);text-decoration:none;letter-spacing:.02em
+}
+.logo em{color:var(--amber);font-style:italic}
+.nav-links{display:flex;align-items:center;gap:24px}
+.nav-links a{
+  font-size:.82rem;color:var(--cream-dim);text-decoration:none;transition:color .25s ease
+}
+.nav-links a:hover{color:var(--cream-strong)}
+.nav-cta{
+  border:1px solid rgba(217,201,163,.35);border-radius:999px;padding:10px 18px;
+  display:inline-flex!important;align-items:center;gap:8px;color:var(--cream)!important;
+  transition:all .35s ease
+}
+.nav-cta:hover{border-color:var(--amber);color:var(--amber)!important;box-shadow:0 0 24px rgba(232,176,75,.18)}
 .nav-cta svg{width:14px;height:14px}
 
-.hero{min-height:clamp(590px,82svh,790px);display:flex;align-items:flex-end;padding:120px clamp(20px,7vw,104px) clamp(54px,8vh,86px);position:relative;isolation:isolate;color:#fff;background:#172220 url('https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=2200&q=88') center 35%/cover no-repeat}
-.hero::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(12,22,21,.88) 0%,rgba(12,22,21,.58) 47%,rgba(12,22,21,.16) 78%),linear-gradient(0deg,rgba(12,22,21,.58),transparent 48%);z-index:-1}
-.hero-stage{width:min(720px,100%)}
-.hero .eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#f2ad8d;margin-bottom:20px;animation:fade-up .55s .05s ease both}
-h1{font-family:var(--serif);font-size:clamp(64px,10vw,132px);font-weight:500;line-height:.86;letter-spacing:0;margin-bottom:24px;animation:fade-up .65s .12s ease both}
-.hero .sub{font-size:clamp(16px,2vw,20px);color:rgba(255,255,255,.84);max-width:610px;line-height:1.55;margin-bottom:32px;animation:fade-up .65s .2s ease both}
-.hero-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;animation:fade-up .65s .28s ease both}
-.primary-cta,.secondary-cta{height:48px;padding:0 19px;display:inline-flex;align-items:center;gap:9px;text-decoration:none;font-size:13px;font-weight:600}
-.primary-cta{background:#ef704e;color:#fff}
-.secondary-cta{border:1px solid rgba(255,255,255,.46);color:#fff}
+.hero{
+  min-height:88vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:6vh 6vw 4vh;perspective:1400px
+}
+.hero-eyebrow{
+  font-size:.75rem;letter-spacing:.35em;text-transform:uppercase;color:var(--cream-dim);
+  margin-bottom:28px;opacity:0;animation:fade-up 1s ease forwards .2s
+}
+h1.title{
+  font-family:var(--serif);font-size:clamp(3rem,9vw,7.5rem);font-weight:300;line-height:.98;
+  letter-spacing:-.01em;opacity:0;animation:fade-up 1.1s ease forwards .4s
+}
+h1.title em{
+  font-style:italic;font-weight:500;
+  background:linear-gradient(120deg,var(--amber),var(--cream-strong) 60%);
+  -webkit-background-clip:text;background-clip:text;color:transparent
+}
+.subtitle{
+  max-width:720px;margin:30px auto 0;font-size:1.08rem;line-height:1.7;
+  color:var(--cream-dim);font-weight:300;opacity:0;animation:fade-up 1.1s ease forwards .65s
+}
+.subtitle strong{color:var(--amber);font-weight:500}
+.hero-ctas{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-top:44px;opacity:0;animation:fade-up 1.1s ease forwards .85s}
+.btn-primary,.btn-ghost,.primary-cta,.secondary-cta{
+  min-height:52px;padding:14px 28px;border-radius:999px;text-decoration:none;display:inline-flex;
+  align-items:center;justify-content:center;gap:10px;font-size:.95rem;cursor:pointer;
+  transition:transform .3s ease,box-shadow .3s ease,border-color .3s ease,background .3s ease,color .3s ease
+}
+.btn-primary,.primary-cta{
+  background:linear-gradient(135deg,var(--amber),#c98a2f);color:var(--void);border:none;
+  box-shadow:0 8px 30px rgba(232,176,75,.25);font-weight:600
+}
+.btn-primary:hover,.primary-cta:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(232,176,75,.4)}
+.btn-ghost,.secondary-cta{
+  background:transparent;color:var(--cream);border:1px solid rgba(217,201,163,.3)
+}
+.btn-ghost:hover,.secondary-cta:hover{border-color:var(--cream);background:rgba(217,201,163,.06)}
 .primary-cta svg,.secondary-cta svg{width:16px;height:16px}
-.hero-aside{position:absolute;right:clamp(20px,5vw,72px);bottom:clamp(54px,8vh,86px);width:220px;border-top:1px solid rgba(255,255,255,.38);padding-top:12px;font-size:11px;line-height:1.55;color:rgba(255,255,255,.66)}
-.hero-aside strong{display:block;color:#fff;font-size:12px;margin-bottom:4px}
+.string-field{
+  width:100%;max-width:1000px;height:180px;margin-top:60px;opacity:0;
+  animation:fade-up 1.2s ease forwards 1.05s
+}
+.string-field svg{width:100%;height:100%;overflow:visible}
+.wave-path{fill:none;stroke-width:1.4;filter:drop-shadow(0 0 6px currentColor)}
 
-.signal-strip{display:grid;grid-template-columns:repeat(3,1fr);background:var(--ink);color:#fff;padding:0 clamp(20px,7vw,104px)}
-.signal-item{min-height:104px;padding:24px 26px;border-left:1px solid rgba(255,255,255,.14);display:flex;align-items:center;gap:14px}
-.signal-item:last-child{border-right:1px solid rgba(255,255,255,.14)}
-.signal-index{font-family:var(--serif);font-size:28px;color:#ef8060}
-.signal-copy strong{display:block;font-size:13px;margin-bottom:2px}
-.signal-copy span{font-size:11px;color:rgba(255,255,255,.55)}
+.signal-strip{
+  width:min(1200px,calc(100% - 12vw));margin:0 auto 4vh;padding:0;
+  display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);
+  border-radius:24px;background:linear-gradient(180deg, rgba(232,176,75,.04), rgba(255,255,255,.015))
+}
+.signal-item{
+  min-height:108px;padding:28px 26px;border-right:1px solid var(--line);
+  display:flex;align-items:center;gap:16px
+}
+.signal-item:last-child{border-right:0}
+.signal-index{font-family:var(--serif);font-size:2rem;color:var(--amber)}
+.signal-copy strong{display:block;font-size:.92rem;margin-bottom:4px;color:var(--cream-strong)}
+.signal-copy span{font-size:.82rem;color:var(--cream-dim)}
 
-.story{padding:clamp(72px,10vw,130px) clamp(20px,7vw,104px);background:var(--paper)}
-.story-intro{display:grid;grid-template-columns:minmax(0,.9fr) minmax(300px,.6fr);gap:clamp(36px,8vw,130px);align-items:end;margin-bottom:70px}
-.section-kicker{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--v);margin-bottom:16px}
-.story h2,.analyzer h2{font-family:var(--serif);font-size:clamp(38px,5.5vw,72px);font-weight:500;line-height:1.02;letter-spacing:0}
-.story-lede{font-size:16px;line-height:1.75;color:var(--ts);padding-bottom:6px}
-.feature-row{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--b2)}
-.feature{padding:26px 30px 12px 0;border-right:1px solid var(--b2);min-height:180px}
-.feature:not(:first-child){padding-left:30px}
+.section,.story,.analyzer,#result{
+  width:min(1200px,100%);margin:0 auto;padding:12vh 8vw
+}
+.section-label,.section-kicker,.summary-kicker,.sec-lbl,.t-lbl,.r-kicker,.summary-detail-label,.panel-label,.raw-lbl,.ctitle,.ml,.rstat-label{
+  font-size:.72rem;letter-spacing:.24em;text-transform:uppercase;color:var(--amber)
+}
+.section h2,.story h2,.analyzer h2,.summary-headline,.t-name,.rzone,.signup-card h2{
+  font-family:var(--serif);font-weight:400;line-height:1.08
+}
+.section h2 em,.story h2 em,.analyzer h2 em{font-style:italic;color:var(--amber)}
+.story-intro,.analyzer-head{
+  display:grid;grid-template-columns:minmax(0,.95fr) minmax(280px,.55fr);
+  gap:clamp(32px,7vw,120px);align-items:end;margin-bottom:56px
+}
+.story h2,.analyzer h2{font-size:clamp(2rem,4.5vw,3.4rem);max-width:820px}
+.story-lede,.analyzer-head p,.summary-text,.rdesc,.ctxt,.foot{
+  font-size:1rem;line-height:1.75;color:var(--cream-dim);font-weight:300
+}
+.feature-row{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-top:64px;
+  border-top:1px solid var(--line)
+}
+.feature{
+  padding:40px 28px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);
+  min-height:210px;transition:background .35s ease
+}
+.feature:hover{background:rgba(232,176,75,.04)}
 .feature:last-child{border-right:0}
-.feature-icon{width:34px;height:34px;color:var(--v);margin-bottom:24px}
-.feature h3{font-family:var(--serif);font-size:20px;font-weight:500;margin-bottom:8px}
-.feature p{font-size:13px;color:var(--tm);line-height:1.65}
+.feature-icon,.feature .f-mark{
+  width:auto;height:auto;display:block;margin-bottom:18px;color:var(--amber);font-size:1.6rem
+}
+.feature h3{font-family:var(--serif);font-weight:500;font-size:1.35rem;margin-bottom:12px;color:var(--cream-strong)}
+.feature p{font-size:.95rem;line-height:1.65;color:var(--cream-dim)}
 
-.analyzer{padding:clamp(70px,9vw,116px) 20px;background:#ded9cc;border-top:1px solid var(--b2)}
-.analyzer-head{width:min(880px,100%);margin:0 auto 36px;display:grid;grid-template-columns:1fr minmax(250px,.55fr);gap:40px;align-items:end}
-.analyzer-head p{font-size:14px;color:var(--ts);line-height:1.7}
+.compare-strip{
+  margin-top:70px;border:1px solid var(--line);border-radius:20px;padding:36px;
+  background:linear-gradient(180deg, rgba(232,176,75,.04), transparent);display:flex;gap:40px;align-items:center;flex-wrap:wrap
+}
+.compare-bar-group{flex:1;min-width:220px}
+.compare-name{font-size:.85rem;color:var(--cream-dim);margin-bottom:10px;letter-spacing:.05em}
+.compare-bar{height:8px;border-radius:4px;background:rgba(217,201,163,.1);overflow:hidden}
+.compare-bar-fill{
+  height:100%;border-radius:4px;background:linear-gradient(90deg,var(--wood),var(--amber));
+  width:0%;transition:width 1.8s cubic-bezier(.16,1,.3,1)
+}
 
-.upload-card{width:100%;max-width:700px;margin:0 auto;background:var(--s1);border:1px solid var(--b2);border-radius:6px;padding:28px;box-shadow:0 18px 55px rgba(42,39,31,.09)}
-.mode-tabs{display:grid;grid-template-columns:repeat(3,1fr);padding:3px;background:var(--s2);border:1px solid var(--b2);border-radius:8px;margin-bottom:20px}
-.mode-tab{height:38px;border:0;border-radius:6px;background:transparent;color:var(--tm);font-family:var(--sans);font-size:12px;cursor:pointer;transition:background .2s,color .2s}
-.mode-tab.active{background:var(--vd);color:var(--tx)}
+.upload-card,.card,.russell-block,.raw-block{
+  background:var(--panel);border:1px solid var(--line);border-radius:24px;
+  backdrop-filter:blur(14px)
+}
+.upload-card{
+  width:100%;max-width:760px;margin:0 auto;padding:32px;
+  box-shadow:0 18px 55px rgba(0,0,0,.18)
+}
+.mode-tabs{
+  display:grid;grid-template-columns:repeat(3,1fr);padding:4px;background:rgba(255,255,255,.03);
+  border:1px solid var(--line);border-radius:999px;margin-bottom:22px
+}
+.mode-tab{
+  min-height:42px;border:0;border-radius:999px;background:transparent;color:var(--cream-dim);
+  font-size:.9rem;cursor:pointer;transition:background .2s,color .2s
+}
+.mode-tab.active{background:rgba(232,176,75,.12);color:var(--cream-strong)}
 .input-panel{display:none}
 .input-panel.active{display:block;animation:fade-up .25s ease both}
-.panel-label{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--tm);margin-bottom:8px}
-.input-row{display:grid;grid-template-columns:1fr auto;gap:8px}
-
-input.name-input{width:100%;height:42px;padding:0 14px;background:var(--s2);border:1px solid var(--b2);border-radius:8px;font-family:var(--sans);font-size:14px;color:var(--tx);outline:none;margin-bottom:14px;transition:border-color .2s}
-input.name-input:focus{border-color:var(--v)}
-input.name-input::placeholder{color:var(--tm)}
+.input-row{display:grid;grid-template-columns:1fr auto;gap:10px}
+input.name-input{
+  width:100%;min-height:48px;padding:0 18px;background:rgba(255,255,255,.03);
+  border:1px solid var(--line);border-radius:999px;font-size:14px;color:var(--cream-strong);
+  outline:none;margin-bottom:14px;transition:border-color .2s,background .2s
+}
+input.name-input:focus{border-color:var(--amber);background:rgba(255,255,255,.045)}
+input.name-input::placeholder{color:rgba(217,201,163,.42)}
 .input-row .name-input{margin-bottom:0}
-.search-button{width:42px;height:42px;border:0;border-radius:8px;background:var(--ink);color:#fff;display:grid;place-items:center;cursor:pointer}
-.search-button:disabled{opacity:.4;cursor:not-allowed}
+.search-button{
+  width:48px;height:48px;border:0;border-radius:50%;background:linear-gradient(135deg,var(--amber),#c98a2f);
+  color:var(--void);display:grid;place-items:center;cursor:pointer
+}
+.search-button:disabled{opacity:.45;cursor:not-allowed}
 .search-button svg{width:17px;height:17px}
-.search-results{display:grid;gap:7px;margin:12px 0 16px;max-height:306px;overflow:auto}
-.search-empty{padding:18px;text-align:center;color:var(--tm);font-size:12px;border:1px dashed var(--b2);border-radius:8px}
-.search-item{width:100%;display:grid;grid-template-columns:88px minmax(0,1fr) 20px;gap:12px;align-items:center;padding:7px;background:var(--s2);border:1px solid transparent;border-radius:8px;color:var(--tx);text-align:left;cursor:pointer}
-.search-item:hover{border-color:var(--b1)}
-.search-item.selected{border-color:var(--v);background:var(--vd)}
-.search-thumb{width:88px;aspect-ratio:16/9;object-fit:cover;border-radius:5px;background:var(--bg)}
+.search-results{display:grid;gap:10px;margin:14px 0 18px;max-height:320px;overflow:auto}
+.search-empty{
+  padding:18px;text-align:center;color:var(--cream-dim);font-size:12px;
+  border:1px dashed var(--line);border-radius:16px
+}
+.search-item{
+  width:100%;display:grid;grid-template-columns:88px minmax(0,1fr) 20px;gap:12px;align-items:center;
+  padding:8px;background:rgba(255,255,255,.035);border:1px solid transparent;border-radius:16px;
+  color:var(--cream-strong);text-align:left;cursor:pointer
+}
+.search-item:hover{border-color:rgba(232,176,75,.35)}
+.search-item.selected{border-color:var(--amber);background:rgba(232,176,75,.1)}
+.search-thumb{width:88px;aspect-ratio:16/9;object-fit:cover;border-radius:12px;background:rgba(255,255,255,.04)}
 .search-copy{min-width:0}
 .search-title{display:block;font-size:12px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.search-meta{display:block;font-size:10px;color:var(--tm);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.search-check{width:16px;height:16px;border:1px solid var(--tm);border-radius:50%;display:grid;place-items:center;font-size:10px;color:transparent}
-.search-item.selected .search-check{border-color:var(--v);background:var(--v);color:#fff}
-.panel-note{font-size:11px;color:var(--tm);margin:-5px 0 14px}
+.search-meta{display:block;font-size:10px;color:var(--cream-dim);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search-check{
+  width:16px;height:16px;border:1px solid rgba(217,201,163,.4);border-radius:50%;
+  display:grid;place-items:center;font-size:10px;color:transparent
+}
+.search-item.selected .search-check{border-color:var(--amber);background:var(--amber);color:var(--void)}
 
-.drop{border:1.5px dashed var(--b1);border-radius:10px;padding:36px 24px;text-align:center;cursor:pointer;transition:all .2s;position:relative;margin-bottom:14px}
-.drop:hover,.drop.drag{border-color:var(--v);background:var(--vd)}
+.drop{
+  border:1.5px dashed rgba(232,176,75,.34);border-radius:24px;padding:40px 24px;text-align:center;
+  cursor:pointer;transition:all .2s;position:relative;margin-bottom:14px;background:rgba(255,255,255,.02)
+}
+.drop:hover,.drop.drag{border-color:var(--amber);background:rgba(232,176,75,.06)}
 .drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-.drop-icon{font-size:32px;margin-bottom:10px;opacity:.7}
-.drop-main{font-size:15px;color:var(--ts);margin-bottom:4px}
-.drop-main strong{color:var(--v);font-weight:400}
-.drop-sub{font-size:11px;color:var(--tm)}
-.file-selected{margin-top:12px;padding:10px 14px;background:var(--td);border-radius:8px;font-size:13px;color:var(--t);display:none;text-align:left}
-
-.go{width:100%;height:46px;background:var(--v);color:#fff;border:none;border-radius:8px;font-family:var(--sans);font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:opacity .2s}
-.go:hover{opacity:.88}
-.go:disabled{opacity:.48;cursor:not-allowed}
-
-.status{margin-top:12px;font-size:11px;color:var(--tm);text-align:center;display:flex;align-items:center;justify-content:center;gap:6px}
+.drop-icon{font-size:32px;margin-bottom:10px;opacity:.75}
+.drop-main{font-size:15px;color:var(--cream-dim);margin-bottom:4px}
+.drop-main strong{color:var(--amber);font-weight:500}
+.drop-sub{font-size:11px;color:rgba(217,201,163,.5)}
+.file-selected{
+  margin-top:12px;padding:10px 14px;background:rgba(232,176,75,.1);border-radius:14px;
+  font-size:13px;color:var(--cream-strong);display:none;text-align:left
+}
+.go{
+  width:100%;min-height:52px;background:linear-gradient(135deg,var(--amber),#c98a2f);color:var(--void);
+  border:none;border-radius:999px;font-size:.95rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  cursor:pointer;transition:opacity .2s,transform .2s
+}
+.go:hover{opacity:.92;transform:translateY(-1px)}
+.go:disabled{opacity:.42;cursor:not-allowed;transform:none}
+.status{
+  margin-top:14px;font-size:11px;color:var(--cream-dim);text-align:center;display:flex;
+  align-items:center;justify-content:center;gap:6px
+}
 .sdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 
 .loader{display:none;padding:70px 20px;text-align:center}
 .sw{width:60px;height:60px;margin:0 auto 20px;position:relative}
 .ring{border-radius:50%;position:absolute;animation:spin linear infinite}
-.r1{width:60px;height:60px;border:1px solid var(--b2);border-top-color:var(--v);animation-duration:1s}
-.r2{width:42px;height:42px;top:9px;left:9px;border:1px solid var(--b2);border-bottom-color:var(--g);animation-duration:1.6s;animation-direction:reverse}
-.lt{font-size:13px;color:var(--tm);letter-spacing:.04em}
-.ls{font-size:11px;color:var(--tm);margin-top:6px;opacity:.85}
+.r1{width:60px;height:60px;border:1px solid var(--line);border-top-color:var(--amber);animation-duration:1s}
+.r2{width:42px;height:42px;top:9px;left:9px;border:1px solid var(--line);border-bottom-color:var(--wood);animation-duration:1.6s;animation-direction:reverse}
+.lt{font-size:13px;color:var(--cream-strong);letter-spacing:.04em}
+.ls{font-size:11px;color:var(--cream-dim);margin-top:6px;opacity:.9}
 
-.err{display:none;max-width:580px;margin:0 auto 20px;background:rgba(250,80,80,.08);border:1px solid rgba(250,80,80,.2);border-radius:10px;padding:13px 16px;font-size:13px;color:#f87}
+.err{
+  display:none;max-width:760px;margin:0 auto 20px;background:rgba(120,24,20,.28);
+  border:1px solid rgba(255,155,150,.28);border-radius:18px;padding:14px 18px;font-size:13px;color:var(--danger)
+}
 
-#result{display:none;max-width:920px;margin:0 auto;padding:70px 20px 80px;scroll-margin-top:20px}
+#result{display:none;scroll-margin-top:20px;padding-top:9vh}
+.t-hero{padding:0 0 26px;border-bottom:1px solid var(--line);margin-bottom:32px}
+.t-lbl{margin-bottom:10px}
+.t-name{font-size:clamp(2rem,5vw,3rem);font-weight:300;line-height:1.08;margin-bottom:8px;color:var(--cream-strong)}
+.t-meta{font-size:.98rem;color:var(--cream-dim);margin-bottom:14px}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{
+  padding:6px 12px;border-radius:999px;font-size:11px;border:1px solid transparent
+}
+.pv{background:rgba(232,176,75,.12);color:var(--amber);border-color:rgba(232,176,75,.18)}
+.pg{background:rgba(138,59,46,.18);color:#f2c07d;border-color:rgba(138,59,46,.3)}
+.pt{background:rgba(217,201,163,.08);color:var(--cream-dim);border-color:var(--line)}
+.pn{background:rgba(255,255,255,.05);color:var(--cream-dim);border-color:var(--line)}
 
-.t-hero{padding:30px 0 26px;border-bottom:1px solid var(--b2);margin-bottom:32px}
-.t-lbl{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--tm);margin-bottom:8px}
-.t-name{font-family:var(--serif);font-size:clamp(24px,5vw,40px);font-weight:300;line-height:1.15;margin-bottom:6px}
-.t-meta{font-size:13px;color:var(--ts);font-weight:400;margin-bottom:14px}
-.pills{display:flex;flex-wrap:wrap;gap:5px}
-.pill{padding:3px 9px;border-radius:20px;font-size:11px}
-.pv{background:var(--vd);color:var(--v)}
-.pg{background:var(--gd);color:var(--g)}
-.pt{background:var(--td);color:var(--t)}
-.pn{background:rgba(255,255,255,.05);color:var(--tm)}
-
-.summary-block{padding:0 0 30px;border-bottom:1px solid var(--b2);margin-bottom:26px}
-.summary-kicker{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--v);margin-bottom:10px}
-.summary-headline{font-family:var(--serif);font-size:clamp(22px,4vw,30px);font-weight:300;line-height:1.2;margin-bottom:12px}
-.summary-text{max-width:760px;font-size:14px;color:var(--ts);line-height:1.8;font-weight:400}
+.summary-block{padding:0 0 30px;border-bottom:1px solid var(--line);margin-bottom:26px}
+.summary-headline{font-size:clamp(1.8rem,4vw,2.5rem);font-weight:300;line-height:1.2;margin:12px 0;color:var(--cream-strong)}
 .summary-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:18px}
-.summary-detail-label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--tm);margin-bottom:3px}
-.summary-detail-value{font-size:12px;color:var(--tx);line-height:1.5}
+.summary-detail-label{margin-bottom:5px}
+.summary-detail-value{font-size:.92rem;color:var(--cream-strong);line-height:1.5}
 
-.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:32px}
-.metric{background:var(--s1);border:1px solid var(--b2);border-radius:10px;padding:14px 10px;text-align:center}
-.mv{font-family:var(--serif);font-size:22px;font-weight:300;line-height:1;margin-bottom:5px}
-.ml{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--tm)}
-
-.sec-lbl{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--tm);margin-bottom:14px;font-weight:500}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:32px}
+.metric{
+  background:var(--panel-soft);border:1px solid var(--line);border-radius:20px;padding:18px 12px;text-align:center
+}
+.mv{font-family:var(--serif);font-size:28px;font-weight:300;line-height:1;color:var(--cream-strong);margin-bottom:6px}
+.ml{color:var(--cream-dim)}
 
 .rgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:22px}
-.card{background:var(--s1);border:1px solid var(--b2);border-radius:10px;overflow:hidden}
 .card.full{grid-column:1/-1}
-.chd{padding:14px 18px 12px;border-bottom:1px solid var(--b2);display:flex;align-items:center;gap:9px}
+.chd{padding:16px 20px 13px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
 .cdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.ctitle{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ts);font-weight:500}
-.cbody{padding:18px}
-.chl{font-family:var(--serif);font-size:17px;font-weight:300;line-height:1.3;margin-bottom:10px}
-.ctxt{font-size:13px;color:var(--ts);line-height:1.75;font-weight:400}
+.ctitle{color:var(--cream-dim)}
+.cbody{padding:20px}
+.chl{font-family:var(--serif);font-size:1.35rem;font-weight:300;line-height:1.3;margin-bottom:10px}
 .ctxt p{margin-bottom:9px}
 .ctxt p:last-child{margin-bottom:0}
 
-.russell-block{background:var(--s1);border:1px solid var(--b2);border-radius:8px;padding:24px;margin-bottom:22px;overflow:hidden}
+.russell-block{padding:24px;margin-bottom:22px;overflow:hidden}
 .rw{display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr);gap:34px;align-items:center}
 .circumplex-chart{width:100%;max-width:340px;aspect-ratio:1;position:relative}
 .circumplex-chart canvas{display:block;width:100%;height:100%;cursor:crosshair;touch-action:pan-y}
-.circumplex-chart canvas:focus-visible{outline:2px solid var(--v);outline-offset:3px}
-.circumplex-tooltip{position:absolute;z-index:3;width:190px;padding:9px 11px;background:rgba(19,32,31,.97);border:1px solid rgba(255,255,255,.18);border-radius:6px;box-shadow:0 10px 28px rgba(0,0,0,.22);pointer-events:none;transform:translateX(-50%)}
-.circumplex-tooltip strong{display:block;font-family:var(--serif);font-size:16px;font-weight:400;color:var(--tx);line-height:1.2;margin-bottom:3px}
-.circumplex-tooltip span{display:block;font-size:10px;color:var(--ts);line-height:1.45}
+.circumplex-chart canvas:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+.circumplex-tooltip{
+  position:absolute;z-index:3;width:190px;padding:9px 11px;background:rgba(11,10,16,.97);
+  border:1px solid rgba(255,255,255,.18);border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.22);
+  pointer-events:none;transform:translateX(-50%)
+}
+.circumplex-tooltip strong{display:block;font-family:var(--serif);font-size:16px;font-weight:400;color:var(--cream-strong);line-height:1.2;margin-bottom:3px}
+.circumplex-tooltip span{display:block;font-size:10px;color:var(--cream-dim);line-height:1.45}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .rinterpret{min-width:0}
-.r-kicker{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--tm);margin-bottom:6px}
-.rcoord{font-family:var(--serif);font-size:32px;font-weight:300;line-height:1;margin-bottom:6px}
-.rzone{font-family:var(--serif);font-size:20px;color:var(--v);line-height:1.2;margin-bottom:13px}
-.rdesc{font-size:13px;color:var(--ts);line-height:1.75;font-weight:400;margin-bottom:20px}
-.rstats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid var(--b2);border-bottom:1px solid var(--b2)}
+.r-kicker{margin-bottom:8px}
+.rcoord{font-family:var(--serif);font-size:36px;font-weight:300;line-height:1;color:var(--cream-strong);margin-bottom:6px}
+.rzone{font-size:24px;color:var(--amber);line-height:1.2;margin-bottom:13px}
+.rstats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .rstat{padding:12px 0}
-.rstat:nth-child(odd){padding-right:14px;border-right:1px solid var(--b2)}
+.rstat:nth-child(odd){padding-right:14px;border-right:1px solid var(--line)}
 .rstat:nth-child(even){padding-left:14px}
-.rstat-value{font-family:var(--serif);font-size:18px;line-height:1;color:var(--tx);margin-bottom:4px}
-.rstat-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--tm)}
+.rstat-value{font-family:var(--serif);font-size:18px;line-height:1;color:var(--cream-strong);margin-bottom:4px}
 .rscale{margin-top:16px;display:grid;gap:9px}
-.rscale-row{display:grid;grid-template-columns:68px 1fr;gap:10px;align-items:center;font-size:10px;color:var(--tm)}
+.rscale-row{display:grid;grid-template-columns:68px 1fr;gap:10px;align-items:center;font-size:10px;color:var(--cream-dim)}
 .rscale-track{height:4px;background:linear-gradient(90deg,#e25a8c 0%,#303044 50%,#4fc4a8 100%);position:relative}
 .rscale-track.arousal{background:linear-gradient(90deg,#5574b8 0%,#303044 50%,#e0a15a 100%)}
-.rscale-marker{position:absolute;width:8px;height:8px;border:2px solid #fff;border-radius:50%;top:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 3px rgba(207,76,54,.2)}
+.rscale-marker{position:absolute;width:8px;height:8px;border:2px solid #fff;border-radius:50%;top:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 3px rgba(232,176,75,.2)}
 
-.raw-block{background:var(--s1);border:1px solid var(--b2);border-radius:10px;padding:18px;margin-bottom:22px}
-.raw-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
-.raw-item{background:var(--s2);border-radius:6px;padding:10px 12px}
-.raw-val{font-family:var(--serif);font-size:17px;font-weight:300;color:var(--tx);margin-bottom:2px}
-.raw-lbl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--tm)}
+.raw-block{padding:18px;margin-bottom:22px}
+.raw-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.raw-item{background:rgba(255,255,255,.03);border-radius:16px;padding:12px 14px}
+.raw-val{font-family:var(--serif);font-size:20px;font-weight:300;color:var(--cream-strong);margin-bottom:3px}
+.raw-lbl{color:var(--cream-dim)}
+.foot{border-top:1px solid var(--line);padding-top:18px;font-style:italic}
 
-.foot{border-top:1px solid var(--b2);padding-top:18px;font-size:11px;color:var(--tm);line-height:1.7;font-style:italic}
-
-@media(max-width:640px){
-  nav{height:62px;padding:0 18px}
-  .nav-links>a:not(.nav-cta){display:none}
-  .hero{min-height:76svh;padding:100px 20px 48px;background-position:62% center}
-  .hero-aside{display:none}
-  h1{font-size:clamp(54px,17vw,68px)}
-  .signal-strip{grid-template-columns:1fr;padding:0 20px}
-  .signal-item{min-height:80px;border-left:0;border-bottom:1px solid rgba(255,255,255,.14);padding:18px 0}
-  .signal-item:last-child{border-right:0;border-bottom:0}
-  .story-intro,.analyzer-head{grid-template-columns:1fr;gap:24px}
-  .feature-row{grid-template-columns:1fr}
-  .feature,.feature:not(:first-child){min-height:0;padding:24px 0;border-right:0;border-bottom:1px solid var(--b2)}
-  .feature:last-child{border-bottom:0}
-  .rgrid{grid-template-columns:1fr}
+@media(max-width:800px){
+  .feature-row,.signal-strip,.metrics,.raw-grid,.summary-details,.rgrid,.rw,.story-intro,.analyzer-head{grid-template-columns:1fr}
+  .story-intro,.analyzer-head{margin-bottom:38px}
+  .signal-strip{width:min(100%,calc(100% - 40px))}
+  .signal-item{min-height:82px;border-right:0;border-bottom:1px solid var(--line)}
+  .signal-item:last-child{border-bottom:0}
+  .feature-row{margin-top:40px}
+  .feature{padding:28px 0 24px;border-right:0;min-height:0}
+  .compare-strip{margin-top:40px;padding:24px}
   .card.full{grid-column:unset}
-  .metrics{grid-template-columns:repeat(2,1fr)}
-  .raw-grid{grid-template-columns:repeat(2,1fr)}
-  .summary-details{grid-template-columns:1fr}
-  .rw{grid-template-columns:1fr;gap:24px}
   .circumplex-chart{margin:0 auto}
-  .upload-card{padding:18px}
+}
+@media(max-width:640px){
+  nav{padding:22px 5vw}
+  .nav-links>a:not(.nav-cta){display:none}
+  .section,.story,.analyzer,#result{padding:8vh 20px}
+  .hero{min-height:74vh;padding:82px 20px 34px}
+  h1.title{font-size:clamp(3.3rem,16vw,4.8rem)}
+  .subtitle{font-size:1rem}
+  .hero-ctas{gap:12px}
+  .btn-primary,.btn-ghost,.primary-cta,.secondary-cta{width:100%}
+  .string-field{height:120px;margin-top:42px}
+  .upload-card,.russell-block,.raw-block,.card{border-radius:20px}
+  .upload-card{padding:20px}
+  .signal-item{padding:20px 18px}
+  .compare-strip{padding:20px}
   .search-item{grid-template-columns:72px minmax(0,1fr) 18px}
   .search-thumb{width:72px}
+  .raw-grid{grid-template-columns:repeat(2,1fr)}
 }
 </style>
 </head>
 <body>
 
+<div class="stage-bg"></div>
+<div class="grain"></div>
+
 <nav>
   <a class="logo" href="#top">Sound<em>Mind</em></a>
   <div class="nav-links">
-    <a href="#method">How it works</a>
-    <a href="#analyzer">Analyzer</a>
-    <a class="nav-cta" href="#analyzer">Analyze a track <i data-lucide="arrow-down"></i></a>
+    <a href="#method">How it listens</a>
+    <a href="#analyzer">Analyze</a>
+    <a class="nav-cta" href="#analyzer">Start listening <i data-lucide="arrow-down"></i></a>
   </div>
 </nav>
 
 <main id="top">
-<section class="hero" aria-labelledby="hero-title">
-  <div class="hero-stage">
-    <div class="eyebrow">Psychoacoustic intelligence</div>
-    <h1 id="hero-title">SoundMind</h1>
-    <p class="sub">Hear beyond the melody. SoundMind translates rhythm, harmony, texture, and voice into a clear map of what music may be doing to your mind and body.</p>
-    <div class="hero-actions">
-      <a class="primary-cta" href="#analyzer">Analyze a track <i data-lucide="audio-waveform"></i></a>
-      <a class="secondary-cta" href="#method">See what it reveals <i data-lucide="arrow-down"></i></a>
-    </div>
+<header class="hero" aria-labelledby="hero-title">
+  <div class="hero-eyebrow">Tempo, key, texture, and vocal cues</div>
+  <h1 class="title" id="hero-title">Play it.<br>Then <em>see</em> what the analyzer heard.</h1>
+  <p class="subtitle"><strong>SoundMind</strong> measures tempo, key, mode, loudness, texture, optional vocal features, and section-level change, then turns those signals into estimated valence and arousal with confidence notes.</p>
+  <div class="hero-ctas">
+    <a class="btn-primary primary-cta" href="#analyzer">Analyze a track <i data-lucide="audio-waveform"></i></a>
+    <a class="btn-ghost secondary-cta" href="#method">See how it listens <i data-lucide="arrow-down"></i></a>
   </div>
-  <div class="hero-aside">
-    <strong>Music, measured as experience.</strong>
-    Acoustic analysis, vocal isolation, and affective interpretation in one listening report.
+  <div class="string-field" aria-hidden="true">
+    <svg viewBox="0 0 1000 180" preserveAspectRatio="none">
+      <path class="wave-path" id="wave1" style="color:#e8b04b" d=""></path>
+      <path class="wave-path" id="wave2" style="color:#8a3b2e" d=""></path>
+      <path class="wave-path" id="wave3" style="color:#d9c9a3" d="" opacity="0.5"></path>
+    </svg>
   </div>
-</section>
+</header>
 
 <section class="signal-strip" aria-label="Analysis capabilities">
-  <div class="signal-item"><span class="signal-index">12+</span><div class="signal-copy"><strong>Acoustic dimensions</strong><span>Tempo, key, dynamics, texture, and more</span></div></div>
-  <div class="signal-item"><span class="signal-index">04</span><div class="signal-copy"><strong>Emotional regions</strong><span>Mapped across valence and arousal</span></div></div>
-  <div class="signal-item"><span class="signal-index">01</span><div class="signal-copy"><strong>Readable report</strong><span>From raw signal to human meaning</span></div></div>
+  <div class="signal-item"><span class="signal-index">12+</span><div class="signal-copy"><strong>Measured features</strong><span>Tempo, key, loudness, texture, speechiness, and more</span></div></div>
+  <div class="signal-item"><span class="signal-index">01</span><div class="signal-copy"><strong>Optional vocal pass</strong><span>Pitch range, shimmer, and vocal HNR when available</span></div></div>
+  <div class="signal-item"><span class="signal-index">03</span><div class="signal-copy"><strong>Confidence layers</strong><span>Warnings, ambiguity notes, and section-level emotional arc</span></div></div>
 </section>
 
-<section class="story" id="method">
+<section class="section story" id="method">
   <div class="story-intro">
     <div>
-      <div class="section-kicker">Listen beneath the surface</div>
-      <h2>Every song leaves a physiological fingerprint.</h2>
+      <div class="section-kicker">How it listens</div>
+      <h2>The analyzer works in <em>three passes</em>.</h2>
     </div>
-    <p class="story-lede">SoundMind examines the measurable structure behind a track, then frames those signals through established models of emotion. The result is not a genre label. It is a closer look at how the music moves.</p>
+    <p class="story-lede">Search for a song, paste a YouTube link, or upload a file. SoundMind trims silence, extracts acoustic features, optionally measures isolated vocals, and then maps the result into a readable interpretation.</p>
   </div>
   <div class="feature-row">
     <article class="feature">
-      <i class="feature-icon" data-lucide="activity"></i>
-      <h3>Measure the signal</h3>
-      <p>Tempo, pulse stability, loudness, spectral balance, dynamics, and tonal center establish the track's acoustic profile.</p>
+      <span class="f-mark">I.</span>
+      <h3>Core acoustic pass</h3>
+      <p>Measures tempo, key and mode, energy, loudness, acousticness, danceability, speechiness, and spectral texture after trimming leading and trailing silence.</p>
     </article>
     <article class="feature">
-      <i class="feature-icon" data-lucide="mic-vocal"></i>
-      <h3>Isolate the voice</h3>
-      <p>Optional stem separation examines vocal pitch, range, shimmer, and harmonic clarity away from the full mix.</p>
+      <span class="f-mark">II.</span>
+      <h3>Optional vocal pass</h3>
+      <p>If Demucs and Praat are available, the analyzer separates the vocal stem and measures F0 mean, range, variation, shimmer, and vocal harmonic clarity.</p>
     </article>
     <article class="feature">
-      <i class="feature-icon" data-lucide="orbit"></i>
-      <h3>Map the feeling</h3>
-      <p>Valence and arousal place the track on an interactive emotional map, with a plain-language interpretation.</p>
+      <span class="f-mark">III.</span>
+      <h3>Section and confidence pass</h3>
+      <p>Builds a section arc, scores estimated valence and arousal over time, and reports ambiguity when tempo or key detection looks uncertain.</p>
     </article>
+  </div>
+  <div class="compare-strip" id="compareStrip">
+    <div class="compare-bar-group">
+      <div class="compare-name">Tier 1 — tempo, key, loudness, texture</div>
+      <div class="compare-bar"><div class="compare-bar-fill" id="bar1"></div></div>
+    </div>
+    <div class="compare-bar-group">
+      <div class="compare-name">Tier 2/3 — vocals, section arc, warnings</div>
+      <div class="compare-bar"><div class="compare-bar-fill" id="bar2"></div></div>
+    </div>
   </div>
 </section>
 
-<section class="analyzer" id="analyzer" aria-labelledby="analyzer-title">
+<section class="section analyzer" id="analyzer" aria-labelledby="analyzer-title">
   <div class="analyzer-head">
     <div>
       <div class="section-kicker">Start an analysis</div>
       <h2 id="analyzer-title">Choose something worth hearing closely.</h2>
     </div>
-    <p>Search YouTube, paste a direct video link, or upload an audio file. SoundMind will handle the technical listening.</p>
+    <p>Search YouTube, paste a direct video link, or upload a file. The analyzer returns measured features first, then an interpretation built on those measurements and the analyzer's own confidence signals.</p>
   </div>
 
   <div class="upload-card">
@@ -313,7 +467,7 @@ input.name-input::placeholder{color:var(--tm)}
         <button class="search-button" id="searchButton" type="submit" aria-label="Search YouTube" title="Search YouTube"><i data-lucide="search"></i></button>
       </form>
       <div class="search-results" id="searchResults" aria-live="polite">
-        <div class="search-empty">Search results will appear here.</div>
+        <div class="search-empty">Search results will appear here for analysis.</div>
       </div>
     </div>
 
@@ -356,14 +510,14 @@ input.name-input::placeholder{color:var(--tm)}
 
 <div id="result">
   <div class="t-hero">
-    <div class="t-lbl">Analysis complete</div>
+    <div class="t-lbl">Analyzer output</div>
     <div class="t-name" id="tname">—</div>
     <div class="t-meta" id="tmeta">—</div>
     <div class="pills" id="pills"></div>
   </div>
 
   <section class="summary-block" aria-labelledby="summaryHeadline">
-    <div class="summary-kicker">At a glance</div>
+    <div class="summary-kicker">Interpreted from measurements</div>
     <h2 class="summary-headline" id="summaryHeadline">—</h2>
     <div class="summary-text" id="summaryText">—</div>
     <div class="summary-details">
@@ -382,10 +536,10 @@ input.name-input::placeholder{color:var(--tm)}
     <div class="metric"><div class="mv" id="mbpm">—</div><div class="ml">BPM</div></div>
     <div class="metric"><div class="mv" id="mkey">—</div><div class="ml">Key</div></div>
     <div class="metric"><div class="mv" id="mmode">—</div><div class="ml">Mode</div></div>
-    <div class="metric"><div class="mv" id="mval">—</div><div class="ml">Valence</div></div>
+    <div class="metric"><div class="mv" id="mval">—</div><div class="ml">Est. valence</div></div>
   </div>
 
-  <div class="sec-lbl">Psychoacoustic breakdown</div>
+  <div class="sec-lbl">Analyzer-guided interpretation</div>
   <div class="rgrid">
     <div class="card" id="ce">
       <div class="chd"><div class="cdot" style="background:var(--v)"></div><div class="ctitle">Emotional effect</div></div>
@@ -406,7 +560,7 @@ input.name-input::placeholder{color:var(--tm)}
   </div>
 
   <div class="russell-block">
-    <div class="sec-lbl">Russell circumplex position</div>
+    <div class="sec-lbl">Estimated circumplex position</div>
     <div class="rw">
       <div class="circumplex-chart">
         <canvas id="rc" width="680" height="680" role="img" tabindex="0" aria-label="Russell circumplex emotional position" aria-describedby="circumplexHelp"></canvas>
@@ -417,7 +571,7 @@ input.name-input::placeholder{color:var(--tm)}
         <span class="sr-only" id="circumplexHelp">Explore the map with a pointer, touch, or arrow keys. Press Escape to return to the measured position.</span>
       </div>
       <div class="rinterpret">
-        <div class="r-kicker">Closest emotional region</div>
+        <div class="r-kicker">Estimated emotional region</div>
         <div class="rcoord" id="rcoord">—°</div>
         <div class="rzone" id="rzone">—</div>
         <div class="rdesc" id="rdesc">—</div>
@@ -436,7 +590,7 @@ input.name-input::placeholder{color:var(--tm)}
   </div>
 
   <div class="raw-block">
-    <div class="sec-lbl">Raw acoustic measurements</div>
+    <div class="sec-lbl">Measured analyzer outputs</div>
     <div class="raw-grid" id="rawGrid"></div>
   </div>
 
@@ -454,10 +608,59 @@ let circumplexHover = null;
 let circumplexPinned = false;
 let circumplexResizeFrame = null;
 
+function buildWave(id, amp, freq, phase) {
+  const el = document.getElementById(id);
+  if (!el) return null;
+  let t = phase;
+  return dt => {
+    let d = 'M 0 90';
+    for (let x = 0; x <= 1000; x += 10) {
+      const y = 90 + Math.sin((x * freq) + t) * amp * Math.sin(x / 1000 * Math.PI);
+      d += ` L ${x} ${y.toFixed(2)}`;
+    }
+    el.setAttribute('d', d);
+    t += dt;
+  };
+}
+
+function initHeroWaves() {
+  const waves = [
+    buildWave('wave1', 55, 0.018, 0),
+    buildWave('wave2', 38, 0.024, 2),
+    buildWave('wave3', 22, 0.03, 4),
+  ].filter(Boolean);
+  if (!waves.length) return;
+  const tick = () => {
+    waves.forEach((wave, index) => wave(0.016 + index * 0.004));
+    requestAnimationFrame(tick);
+  };
+  tick();
+}
+
+function setupCompareStrip() {
+  const strip = document.getElementById('compareStrip');
+  if (!strip) return;
+  let animated = false;
+  const checkCompare = () => {
+    if (animated) return;
+    const rect = strip.getBoundingClientRect();
+    if (rect.top < window.innerHeight * 0.82) {
+      document.getElementById('bar1').style.width = '74%';
+      document.getElementById('bar2').style.width = '92%';
+      animated = true;
+      window.removeEventListener('scroll', checkCompare);
+    }
+  };
+  window.addEventListener('scroll', checkCompare);
+  checkCompare();
+}
+
 // ── init ─────────────────────────────────────────────────
 window.onload = () => {
   checkBackend();
   if (window.lucide) window.lucide.createIcons();
+  initHeroWaves();
+  setupCompareStrip();
   updateAnalyzeButton();
   setupCircumplexInteraction();
   window.addEventListener('resize', () => {
@@ -500,7 +703,7 @@ function updateAnalyzeButton() {
       ? Boolean(document.getElementById('youtubeUrl').value.trim())
       : Boolean(uploadedFile);
   button.disabled = !ready;
-  button.textContent = ready ? 'Analyze this song' : inputMode === 'search' ? 'Select a song to analyze' : 'Add a song to analyze';
+  button.textContent = ready ? 'Run the analyzer' : inputMode === 'search' ? 'Select a track to analyze' : 'Add a track to analyze';
 }
 
 async function searchSongs() {
@@ -511,7 +714,7 @@ async function searchSongs() {
   const results = document.getElementById('searchResults');
   showErr('');
   button.disabled = true;
-  results.innerHTML = '<div class="search-empty">Searching YouTube…</div>';
+  results.innerHTML = '<div class="search-empty">Searching YouTube for analyzable tracks…</div>';
 
   try {
     const response = await fetch(API + '/api/search?q=' + encodeURIComponent(query));
@@ -519,7 +722,7 @@ async function searchSongs() {
     if (!response.ok) throw new Error(data.error || 'Search failed.');
     renderSearchResults(data.results || []);
   } catch (error) {
-    results.innerHTML = '<div class="search-empty">No results available.</div>';
+    results.innerHTML = '<div class="search-empty">No analyzable results available.</div>';
     showErr(error.message);
   } finally {
     button.disabled = false;
@@ -533,7 +736,7 @@ function renderSearchResults(results) {
   updateAnalyzeButton();
 
   if (!results.length) {
-    container.innerHTML = '<div class="search-empty">No matching songs found.</div>';
+    container.innerHTML = '<div class="search-empty">No matching tracks found.</div>';
     return;
   }
 
@@ -580,7 +783,7 @@ async function checkBackend() {
     const d = await r.json();
     if (d.openai && d.python && d.downloader) {
       dot.style.background = 'var(--t)';
-      txt.textContent = 'Backend ready';
+      txt.textContent = 'Analyzer backend ready';
     } else {
       dot.style.background = 'var(--g)';
       const missing = [!d.openai && 'OpenAI key', !d.python && 'Python', !d.downloader && 'Downloader'].filter(Boolean);
@@ -588,7 +791,7 @@ async function checkBackend() {
     }
   } catch {
     dot.style.background = '#f87';
-    txt.textContent = 'Backend not running — start with: node server.js';
+    txt.textContent = 'Analyzer backend not running — start with: node server.js';
   }
 }
 
@@ -614,7 +817,7 @@ async function analyze() {
   if (isUpload && !uploadedFile) { showErr('Please select an audio file first.'); return; }
   if (!isUpload && !youtubeUrl) { showErr('Please select a song or paste a YouTube URL first.'); return; }
 
-  setLoad(true, isUpload ? 'Uploading file…' : 'Preparing song for analysis…');
+  setLoad(true, isUpload ? 'Uploading file to analyzer…' : 'Preparing track for analysis…');
 
   try {
     let r;
@@ -622,10 +825,10 @@ async function analyze() {
       const formData = new FormData();
       formData.append('audio', uploadedFile);
       formData.append('song_name', document.getElementById('uploadSongName').value || uploadedFile.name);
-      setStep('Analyzing acoustics with librosa…');
+      setStep('Extracting acoustic features…');
       r = await fetch(API + '/api/analyze', { method: 'POST', body: formData });
     } else {
-      setStep('Analyzing the selected song…');
+      setStep('Preparing the selected track…');
       r = await fetch(API + '/api/download-and-analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -643,7 +846,7 @@ async function analyze() {
       throw new Error(e.error || 'Analysis failed');
     }
 
-    setStep('Generating psychoacoustic report…');
+    setStep('Generating interpretation from analyzer output…');
     const { payload, report } = await r.json();
 
     setLoad(false);
@@ -667,7 +870,7 @@ function render(payload, report) {
     `${payload.track.key} ${payload.track.mode} · ${payload.track.tempo} BPM · ${formatDuration(payload.track.duration_s)}`;
 
   const summary = report.summary || {};
-  document.getElementById('summaryHeadline').textContent = summary.headline || 'A concise listening profile';
+  document.getElementById('summaryHeadline').textContent = summary.headline || 'A measured listening profile';
   document.getElementById('summaryText').textContent = summary.text || 'Summary unavailable.';
   document.getElementById('summarySignature').textContent = summary.emotional_signature || '—';
   document.getElementById('summaryBestFor').textContent = summary.best_for || '—';
@@ -680,7 +883,9 @@ function render(payload, report) {
   if (payload.scores.arousal > 0.6) ap('High energy', 'pg'); else if (payload.scores.arousal < 0.3) ap('Low energy', 'pt');
   ap(payload.track.mode === 'major' ? 'Major' : 'Minor', 'pn');
   if (payload.track.acousticness > 0.6) ap('Acoustic', 'pt');
-  ap('librosa analysis', 'pn');
+  ap('feature-based estimates', 'pn');
+  if (payload.analysis?.confidence && payload.analysis.confidence !== 'high') ap('confidence partial', 'pt');
+  if ((payload.analysis?.warnings || []).length) ap(`${payload.analysis.warnings.length} warning${payload.analysis.warnings.length === 1 ? '' : 's'}`, 'pn');
 
   // Metrics
   document.getElementById('mbpm').textContent  = payload.track.tempo;
@@ -736,17 +941,17 @@ function render(payload, report) {
 
   // Raw measurements
   const rawItems = [
-    ['Energy',        payload.scores.raw_energy,      2],
-    ['Valence (raw)', payload.scores.raw_valence,      2],
-    ['Arousal',       payload.scores.arousal,          2],
+    ['RMS energy',    payload.scores.raw_energy,      2],
+    ['Valence estimate', payload.scores.raw_valence,   2],
+    ['Arousal estimate', payload.scores.arousal,       2],
     ['Acousticness',  payload.track.acousticness,      2],
     ['Danceability',  payload.track.danceability,      2],
     ['Speechiness',   payload.track.speechiness,       2],
     ['Loudness',      payload.track.loudness + ' dB',  null],
     ['Dynamic range', payload.texture?.dynamic_range_db + ' dB', null],
     ['Brightness',    Math.round((payload.texture?.brightness || 0) * 100) + '%', null],
-    ['Pulse stability', Math.round((payload.texture?.tempo_stability || 0) * 100) + '%', null],
-    ['Spectral center', Math.round(payload.texture?.spectral_centroid_hz || 0) + ' Hz', null],
+    ['Tempo stability', Math.round((payload.texture?.tempo_stability || 0) * 100) + '%', null],
+    ['Spectral centroid', Math.round(payload.texture?.spectral_centroid_hz || 0) + ' Hz', null],
   ];
   if (payload.vocals) {
     rawItems.push(

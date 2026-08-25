@@ -33,7 +33,20 @@ The default report model is `gpt-5.4` for higher-quality writing. Set `OPENAI_MO
 
 Isolated vocal analysis is enabled by default. Demucs separates the vocal stem, and Praat measures pitch range, pitch variation, shimmer, and vocal HNR. Set `SOUNDMIND_ENABLE_DEMUCS=0` in `.env` to disable this slower stage.
 
-SoundMind stores uploads and downloaded working files in `.tmp` on the project drive and removes each job before returning its response. Set `SOUNDMIND_TEMP_DIR` to use a different drive or directory with at least 500 MB free. The server executes the downloader built by `npm test` directly, avoiding a `dotnet run` build on every request.
+The analyzer trims leading/trailing silence before feature extraction and now returns confidence diagnostics for tempo ambiguity and key ambiguity alongside the main metrics.
+
+SoundMind stores uploads and downloaded working files in `.tmp` on the project drive and removes each job before returning its response. Set `SOUNDMIND_TEMP_DIR` to use a different drive or directory with at least 500 MB free. The server executes the downloader built by `npm test` / `postinstall` directly, avoiding a `dotnet run` build on every request.
+
+## Deploy notes
+
+The downloader binary is gitignored (`**/bin/`), so a fresh host must build it. Install **.NET SDK 10** on the server (same major as `downloader/YoutubeDownloader-prime/global.json`), then either:
+
+- run `npm install` (runs `postinstall` → `build:downloader`), or
+- run `npm run build:downloader` before `npm start`
+
+If the binary is still missing at boot, `server.js` attempts one build automatically. You can also point `SOUNDMIND_DOWNLOADER_PATH` at a prebuilt `SoundMind.Downloader` / `.dll` / `.exe`.
+
+This app needs a long-running Node host with Python and .NET — not a static-only or serverless-only host.
 
 ## API
 

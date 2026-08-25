@@ -13,11 +13,7 @@ const PORT = process.env.PORT || 3001;
 const { OPENAI_API_KEY } = process.env;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.4';
 const DOWNLOADER_ROOT = path.join(__dirname, 'downloader', 'YoutubeDownloader-prime');
-const DOWNLOADER_BUILD_DIR = path.join(DOWNLOADER_ROOT, 'SoundMind.Downloader', 'bin', 'Debug', 'net10.0');
-const DEFAULT_DOWNLOADER_TARGET = path.join(
-  DOWNLOADER_BUILD_DIR,
-  process.platform === 'win32' ? 'SoundMind.Downloader.exe' : 'SoundMind.Downloader'
-);
+const DOWNLOADER_PROJECT = path.join(DOWNLOADER_ROOT, 'SoundMind.Downloader', 'SoundMind.Downloader.csproj');
 const WORK_ROOT = path.resolve(process.env.SOUNDMIND_TEMP_DIR || path.join(__dirname, '.tmp'));
 const CACHE_ROOT = path.join(__dirname, '.cache');
 
@@ -31,9 +27,36 @@ const CHILD_PROCESS_ENV = {
   XDG_CACHE_HOME: CACHE_ROOT
 };
 
+function getDownloaderBinaryCandidates() {
+  const executable = process.platform === 'win32' ? 'SoundMind.Downloader.exe' : 'SoundMind.Downloader';
+  const configs = ['Debug', 'Release'];
+  const candidates = [];
+
+  for (const config of configs) {
+    const dir = path.join(DOWNLOADER_ROOT, 'SoundMind.Downloader', 'bin', config, 'net10.0');
+    candidates.push(path.join(dir, executable));
+    candidates.push(path.join(dir, 'SoundMind.Downloader.dll'));
+  }
+
+  return candidates;
+}
+
 function getDownloaderTargetPath() {
   const envPath = process.env.SOUNDMIND_DOWNLOADER_PATH || process.env.SOUND_MIND_YTD_PATH || process.env.YTD_PATH;
-  return envPath ? path.resolve(envPath) : DEFAULT_DOWNLOADER_TARGET;
+  if (envPath) return path.resolve(envPath);
+
+  for (const candidate of getDownloaderBinaryCandidates()) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+
+  // Prefer the built binary path for clear error messages; fall back to project for dotnet run.
+  return getDownloaderBinaryCandidates()[0] || DOWNLOADER_PROJECT;
+}
+
+function isDownloaderAvailable() {
+  const envPath = process.env.SOUNDMIND_DOWNLOADER_PATH || process.env.SOUND_MIND_YTD_PATH || process.env.YTD_PATH;
+  if (envPath) return fs.existsSync(path.resolve(envPath));
+  return getDownloaderBinaryCandidates().some((candidate) => fs.existsSync(candidate));
 }
 
 function getDownloaderInvocation(commandArgs) {
@@ -45,6 +68,34 @@ function getDownloaderInvocation(commandArgs) {
     return { file: 'dotnet', args: [target, ...commandArgs], cwd: path.dirname(target) };
   }
   return { file: target, args: commandArgs, cwd: path.dirname(target) };
+}
+
+function ensureDownloaderBuilt() {
+  return new Promise((resolve) => {
+    if (isDownloaderAvailable()) return resolve(true);
+    if (!fs.existsSync(DOWNLOADER_PROJECT)) {
+      console.warn('  Downloader: ✗ project not found — YouTube download will be unavailable');
+      return resolve(false);
+    }
+
+    console.log('  Downloader: building SoundMind.Downloader (missing from deploy)...');
+    execFile(
+      'dotnet',
+      ['build', DOWNLOADER_PROJECT, '--nologo', '-v', 'q'],
+      { cwd: path.dirname(DOWNLOADER_PROJECT), env: CHILD_PROCESS_ENV, timeout: 10 * 60 * 1000 },
+      (err, stdout, stderr) => {
+        if (stdout) process.stdout.write(stdout);
+        if (stderr) process.stderr.write(stderr);
+        if (err) {
+          console.warn('  Downloader: ✗ build failed — install .NET SDK 10 and re-deploy, or set SOUNDMIND_DOWNLOADER_PATH');
+          return resolve(false);
+        }
+        const ok = isDownloaderAvailable();
+        console.log(ok ? '  Downloader: ✓ built' : '  Downloader: ✗ build finished but binary not found');
+        resolve(ok);
+      }
+    );
+  });
 }
 
 function ensureWorkSpace(minimumBytes = 500 * 1024 * 1024) {
@@ -147,6 +198,9 @@ function computeArousal(tempo, energy) {
   const tempoNorm = Math.max(0, Math.min(1, (tempo - 60) / 120));
   return Math.max(0, Math.min(1, energy * 0.65 + tempoNorm * 0.35));
 }
+function isFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value);
+}
 function circumplexPosition(valence, arousal) {
   const v = valence * 2 - 1;
   const a = arousal * 2 - 1;
@@ -161,8 +215,8 @@ function circumplexPosition(valence, arousal) {
   };
 }
 function buildPayload(raw, songName) {
-  const adjValence = modeAdjustedValence(raw.valence, raw.mode);
-  const arousal    = computeArousal(raw.tempo, raw.energy);
+  const adjValence = isFiniteNumber(raw.valence) ? raw.valence : modeAdjustedValence(0.5, raw.mode);
+  const arousal    = isFiniteNumber(raw.arousal) ? raw.arousal : computeArousal(raw.tempo, raw.energy);
   const pos        = circumplexPosition(adjValence, arousal);
   return {
     song_name: songName,
@@ -203,6 +257,10 @@ function buildPayload(raw, songName) {
     analysis: {
       confidence: raw.confidence || 'partial',
       key_confidence: raw.key_confidence,
+      key_correlation: raw.key_correlation,
+      key_alternatives: raw.key_alternatives || [],
+      tempo_confidence: raw.tempo_confidence,
+      tempo_candidates_bpm: raw.tempo_candidates_bpm || [],
       warnings: raw.warnings || [],
       sections: raw.sections || []
     },
@@ -526,7 +584,7 @@ app.get('/api/health', (req, res) => {
       openai: !!OPENAI_API_KEY,
       openai_model: OPENAI_MODEL,
       python: pythonOk,
-      downloader: fs.existsSync(getDownloaderTargetPath()),
+      downloader: isDownloaderAvailable(),
       ffmpeg: !!getFfmpegPath()
     });
   });
@@ -540,11 +598,13 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message });
 });
 
-// Change this at the very bottom of your server.js file
-app.listen(PORT, () => {
-  console.log(`\n  SoundMind → http://localhost:${PORT}\n`);
-  console.log(`  OpenAI:  ${OPENAI_API_KEY ? `✓ ${OPENAI_MODEL}` : '✗ add OPENAI_API_KEY to .env'}`);
-  console.log(`  Upload:  POST /api/analyze (multipart, field: "audio")\n`);
-  console.log(`  Search:  GET /api/search?q=<song name>`);
-  console.log(`  YouTube: POST /api/download-and-analyze (json, field: "url")\n`);
+ensureDownloaderBuilt().then((downloaderOk) => {
+  app.listen(PORT, () => {
+    console.log(`\n  SoundMind → http://localhost:${PORT}\n`);
+    console.log(`  OpenAI:     ${OPENAI_API_KEY ? `✓ ${OPENAI_MODEL}` : '✗ add OPENAI_API_KEY to .env'}`);
+    console.log(`  Downloader: ${downloaderOk ? '✓' : '✗ Missing — run npm run build:downloader (needs .NET SDK 10)'}`);
+    console.log(`  Upload:     POST /api/analyze (multipart, field: "audio")`);
+    console.log(`  Search:     GET /api/search?q=<song name>`);
+    console.log(`  YouTube:    POST /api/download-and-analyze (json, field: "url")\n`);
+  });
 });

@@ -6,6 +6,7 @@
     "start": "node server.js",
     "check": "node --check server.js",
     "build:downloader": "dotnet build downloader/YoutubeDownloader-prime/SoundMind.Downloader/SoundMind.Downloader.csproj --nologo",
+    "postinstall": "npm run build:downloader || node -e \"console.warn('[soundmind] Downloader build skipped — install .NET SDK 10 for YouTube downloads')\"",
     "test": "npm run check && npm run build:downloader"
   },
   "keywords": [],

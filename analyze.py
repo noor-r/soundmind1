@@ -37,6 +37,10 @@ MIN_DURATION   = 8.0
 ANALYSIS_SR    = 22050
 MAX_DURATION   = 360.0
 MAX_SECTION_FRAMES = 1500
+SILENCE_TRIM_DB = 30
+TEMPO_FOLD_MIN_BPM = 70.0
+TEMPO_FOLD_MAX_BPM = 190.0
+SECTION_SIMILARITY_THRESHOLD = 0.9
 KEY_NAMES      = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 KS_MAJOR = np.array([6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88])
 KS_MINOR = np.array([6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17])
@@ -52,22 +56,155 @@ def normalise(arr):
     s = arr.sum()
     return arr / s if s > 1e-9 else arr
 
+def safe_corrcoef(a, b):
+    if np.std(a) < 1e-9 or np.std(b) < 1e-9:
+        return -1.0
+    corr = float(np.corrcoef(a, b)[0, 1])
+    return corr if np.isfinite(corr) else -1.0
+
+def trim_for_analysis(y, sr):
+    try:
+        y_trim, idx = librosa.effects.trim(y, top_db=SILENCE_TRIM_DB)
+        if len(y_trim) == 0:
+            return y, 0.0, 0.0
+        start_s = float(idx[0] / sr)
+        end_trim_s = float((len(y) - idx[1]) / sr)
+        return y_trim, start_s, end_trim_s
+    except Exception:
+        return y, 0.0, 0.0
+
+def fold_tempo(tempo):
+    tempo = float(tempo)
+    if not np.isfinite(tempo) or tempo <= 0:
+        return 0.0
+    while tempo < TEMPO_FOLD_MIN_BPM:
+        tempo *= 2.0
+    while tempo > TEMPO_FOLD_MAX_BPM:
+        tempo /= 2.0
+    return tempo
+
+def estimate_tempo(y, sr, onset_env=None):
+    onset_env = onset_env if onset_env is not None else librosa.onset.onset_strength(y=y, sr=sr)
+
+    beat_tempo = 0.0
+    beat_frames = np.array([], dtype=int)
+    try:
+        tempo_raw, beat_frames = librosa.beat.beat_track(onset_envelope=onset_env, sr=sr)
+        beat_tempo = fold_tempo(np.atleast_1d(tempo_raw).flat[0])
+    except Exception:
+        beat_frames = np.array([], dtype=int)
+
+    frame_tempi = np.array([], dtype=float)
+    try:
+        frame_tempi = np.asarray(
+            librosa.feature.tempo(onset_envelope=onset_env, sr=sr, aggregate=None)
+        ).reshape(-1)
+        frame_tempi = frame_tempi[np.isfinite(frame_tempi) & (frame_tempi > 0)]
+    except Exception:
+        frame_tempi = np.array([], dtype=float)
+
+    folded_frames = np.array([tempo for tempo in (fold_tempo(t) for t in frame_tempi) if tempo > 0], dtype=float)
+    candidates = []
+
+    if beat_tempo > 0:
+        candidates.append(beat_tempo)
+    if folded_frames.size:
+        rounded, counts = np.unique(np.round(folded_frames).astype(int), return_counts=True)
+        top_idx = np.argsort(counts)[::-1][:3]
+        candidates.extend(float(rounded[i]) for i in top_idx)
+        candidates.append(fold_tempo(np.median(frame_tempi)))
+
+    if not candidates:
+        return {
+            "tempo": 120.0,
+            "confidence": 0.0,
+            "candidates": [120.0],
+            "onset_env": onset_env,
+            "beat_frames": beat_frames,
+        }
+
+    unique_candidates = []
+    for cand in candidates:
+        if cand <= 0:
+            continue
+        if not any(abs(cand - existing) < 1.0 for existing in unique_candidates):
+            unique_candidates.append(cand)
+
+    def frame_support(candidate):
+        if not folded_frames.size:
+            return 0.0
+        distances = np.abs(folded_frames - candidate)
+        return float(np.mean(np.exp(-0.5 * (distances / 4.0) ** 2)))
+
+    scored_candidates = []
+    for candidate in unique_candidates:
+        support = frame_support(candidate)
+        if beat_tempo > 0:
+            beat_agreement = float(np.clip(1.0 - abs(candidate - beat_tempo) / 20.0, 0.0, 1.0))
+        else:
+            beat_agreement = 0.25
+        score = support * 0.7 + beat_agreement * 0.3
+        scored_candidates.append((candidate, score))
+
+    scored_candidates.sort(key=lambda item: item[1], reverse=True)
+    chosen_tempo, chosen_score = scored_candidates[0]
+    sorted_candidates = [round(float(candidate), 1) for candidate, _ in scored_candidates[:3]]
+
+    confidence = chosen_score
+    if np.mean(onset_env) < 1e-4:
+        confidence *= 0.75
+    if len(beat_frames) < 4:
+        confidence *= 0.85
+
+    return {
+        "tempo": round(float(chosen_tempo), 2),
+        "confidence": round(float(np.clip(confidence, 0.0, 1.0)), 3),
+        "candidates": sorted_candidates,
+        "onset_env": onset_env,
+        "beat_frames": beat_frames,
+    }
+
 def detect_key_mode(y, sr):
-    """Krumhansl-Schmuckler key detection - works on pop/hip-hop/electronic."""
-    chroma      = librosa.feature.chroma_cqt(y=y, sr=sr, bins_per_octave=36)
-    chroma_mean = normalise(chroma.mean(axis=1))
-    best_score, best_key, best_mode = -np.inf, 0, 1
+    """Harmonic-aware Krumhansl-Schmuckler key detection with ambiguity reporting."""
+    y_harm, _ = librosa.effects.hpss(y, margin=4.0)
+    chroma_harm = librosa.feature.chroma_cqt(y=y_harm, sr=sr, bins_per_octave=36)
+    chroma_mix = librosa.feature.chroma_stft(y=y, sr=sr)
+    chroma_mean = normalise(
+        normalise(chroma_harm.mean(axis=1)) * 0.75 +
+        normalise(chroma_mix.mean(axis=1)) * 0.25
+    )
+
+    scored_keys = []
     maj_norm = normalise(KS_MAJOR)
     min_norm = normalise(KS_MINOR)
     for i in range(12):
         rotated = np.roll(chroma_mean, -i)
-        maj_r = float(np.corrcoef(rotated, maj_norm)[0, 1])
-        min_r = float(np.corrcoef(rotated, min_norm)[0, 1])
-        if maj_r > best_score:
-            best_score, best_key, best_mode = maj_r, i, 1
-        if min_r > best_score:
-            best_score, best_key, best_mode = min_r, i, 0
-    return int(best_key), int(best_mode), round(float(best_score), 3)
+        scored_keys.append({"key": i, "mode": 1, "score": safe_corrcoef(rotated, maj_norm)})
+        scored_keys.append({"key": i, "mode": 0, "score": safe_corrcoef(rotated, min_norm)})
+
+    scored_keys.sort(key=lambda item: item["score"], reverse=True)
+    best = scored_keys[0]
+    runner_up = scored_keys[1]
+    score_strength = float(np.clip((best["score"] + 1.0) / 2.0, 0.0, 1.0))
+    margin_strength = float(np.clip((best["score"] - runner_up["score"]) / 0.2, 0.0, 1.0))
+    confidence = round(float(np.clip(score_strength * 0.7 + margin_strength * 0.3, 0.0, 1.0)), 3)
+
+    return {
+        "key": int(best["key"]),
+        "key_name": KEY_NAMES[int(best["key"])],
+        "mode": int(best["mode"]),
+        "mode_name": "major" if int(best["mode"]) == 1 else "minor",
+        "key_confidence": confidence,
+        "key_correlation": round(float(best["score"]), 3),
+        "key_alternatives": [
+            {
+                "key_name": KEY_NAMES[int(item["key"])],
+                "mode_name": "major" if int(item["mode"]) == 1 else "minor",
+                "correlation": round(float(item["score"]), 3),
+            }
+            for item in scored_keys[1:3]
+        ],
+    }
 
 def compute_hnr_approx(y, sr):
     """HNR from full mix via harmonic/percussive separation."""
@@ -106,9 +243,9 @@ def compute_acousticness(y, sr):
     roll_score = float(np.clip(1 - (roll - 3000)  / 6000, 0, 1))
     return round(zcr_score * 0.6 + roll_score * 0.4, 3)
 
-def compute_danceability(y, sr, tempo):
+def compute_danceability(y, sr, tempo, onset_env=None):
     """Onset regularity + tempo in dance range (90-140 BPM peak)."""
-    onset_env = librosa.onset.onset_strength(y=y, sr=sr)
+    onset_env = onset_env if onset_env is not None else librosa.onset.onset_strength(y=y, sr=sr)
     if np.mean(onset_env) < 1e-9:
         return 0.5
     cv = float(np.std(onset_env) / (np.mean(onset_env) + 1e-9))
@@ -116,13 +253,14 @@ def compute_danceability(y, sr, tempo):
     tempo_score = float(np.clip(1 - abs(tempo - 115) / 80, 0, 1))
     return round(regularity * 0.6 + tempo_score * 0.4, 3)
 
-def compute_temporal_features(y, sr):
+def compute_temporal_features(y, sr, onset_env=None, beat_frames=None):
     """Dynamics, transient density, and pulse stability from frame-level energy."""
     rms = librosa.feature.rms(y=y)[0]
     rms_db = librosa.amplitude_to_db(np.maximum(rms, 1e-8), ref=1.0)
-    onset_env = librosa.onset.onset_strength(y=y, sr=sr)
+    onset_env = onset_env if onset_env is not None else librosa.onset.onset_strength(y=y, sr=sr)
     onset_frames = librosa.onset.onset_detect(onset_envelope=onset_env, sr=sr)
-    _, beat_frames = librosa.beat.beat_track(onset_envelope=onset_env, sr=sr)
+    if beat_frames is None:
+        _, beat_frames = librosa.beat.beat_track(onset_envelope=onset_env, sr=sr)
 
     duration = max(float(librosa.get_duration(y=y, sr=sr)), 1e-9)
     energy_variability = float(np.std(rms) / (np.mean(rms) + 1e-9))
@@ -239,8 +377,58 @@ def separate_vocals_demucs(filepath):
     except Exception as e:
         return None, None, str(e)
 
-def detect_sections(y, sr, n_sections=5):
-    """Novelty-curve section detection. Zero extra deps beyond librosa."""
+def assign_section_labels(sections, embeddings):
+    if not sections:
+        return sections
+
+    labeled_sections = [dict(section) for section in sections]
+    count = len(labeled_sections)
+    durations = np.array([section["end_s"] - section["start_s"] for section in labeled_sections], dtype=float)
+    median_duration = float(np.median(durations)) if len(durations) else 0.0
+
+    sim = np.eye(count, dtype=float)
+    if embeddings:
+        emb = np.vstack(embeddings)
+        emb = emb / np.maximum(np.linalg.norm(emb, axis=1, keepdims=True), 1e-9)
+        sim = emb @ emb.T
+
+    internal_indices = list(range(1, count - 1)) if count > 2 else list(range(count))
+    chorus_group = set()
+    if internal_indices:
+        repeated_counts = {
+            i: int(np.sum(sim[i, internal_indices] >= SECTION_SIMILARITY_THRESHOLD)) - 1
+            for i in internal_indices
+        }
+        chorus_seed = max(internal_indices, key=lambda i: (repeated_counts[i], durations[i]))
+        if repeated_counts[chorus_seed] > 0:
+            chorus_group = {
+                i for i in internal_indices
+                if sim[chorus_seed, i] >= SECTION_SIMILARITY_THRESHOLD
+            }
+
+    first_chorus = min(chorus_group) if chorus_group else None
+    last_chorus = max(chorus_group) if chorus_group else None
+
+    for index, section in enumerate(labeled_sections):
+        label = f"section_{index + 1}"
+        if index in chorus_group:
+            label = "chorus"
+        elif index == 0 and count >= 3 and durations[index] <= max(median_duration * 0.9, 12.0):
+            label = "intro"
+        elif index == count - 1 and count >= 3 and durations[index] <= max(median_duration * 0.9, 12.0):
+            label = "outro"
+        elif chorus_group and index == first_chorus - 1 and durations[index] <= max(median_duration * 0.95, 10.0):
+            label = "pre_chorus"
+        elif chorus_group and last_chorus is not None and index == last_chorus + 1 and index < count - 1:
+            label = "bridge"
+        elif 0 < index < count - 1:
+            label = "verse"
+        section["label"] = label
+
+    return labeled_sections
+
+def detect_sections(y, sr, n_sections=5, start_offset_s=0.0, total_duration_s=None):
+    """Novelty-curve section detection with repeated-section-aware labeling."""
     try:
         chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=512)
         mfcc   = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13, hop_length=512)
@@ -265,30 +453,59 @@ def detect_sections(y, sr, n_sections=5):
 
         hop      = 512 * frame_step
         min_dist = max(1, int(sr * 15 / hop))
-        peaks, _ = scipy.signal.find_peaks(novelty, distance=min_dist)
+        peaks, props = scipy.signal.find_peaks(
+            novelty,
+            distance=min_dist,
+            prominence=max(float(np.std(novelty)) * 0.15, 1e-6),
+        )
+        if len(peaks) > n_sections - 1:
+            top_idx = np.argsort(props["prominences"])[::-1][:n_sections - 1]
+            peaks = np.sort(peaks[top_idx])
 
-        duration_frames = R.shape[0]
+        duration_frames = feat.shape[1]
         duration_s = float(librosa.frames_to_time(duration_frames, sr=sr, hop_length=hop))
 
         boundaries = [0.0]
-        for p in sorted(peaks)[:n_sections - 1]:
+        for p in peaks:
             t = float(librosa.frames_to_time(p, sr=sr, hop_length=hop))
             boundaries.append(round(t, 1))
         boundaries.append(round(duration_s, 1))
         boundaries = sorted(set(boundaries))
 
-        labels = ["intro","verse","chorus","bridge","outro",
-                  "section_6","section_7","section_8"]
         sections = []
+        embeddings = []
         for i, (start, end) in enumerate(zip(boundaries[:-1], boundaries[1:])):
             if end - start < 5.0:
                 continue
+            start_frame = int(np.floor((start * sr) / hop))
+            end_frame = int(np.ceil((end * sr) / hop))
+            segment_feat = feat[:, start_frame:end_frame]
+            if segment_feat.size == 0:
+                continue
+            embedding = np.mean(segment_feat, axis=1)
+            embeddings.append(embedding)
             sections.append({
-                "label":   labels[i] if i < len(labels) else f"section_{i+1}",
+                "label": f"section_{i+1}",
                 "start_s": round(start, 1),
-                "end_s":   round(end, 1)
+                "end_s": round(end, 1),
             })
-        return sections if sections else None
+
+        sections = assign_section_labels(sections, embeddings)
+        if not sections:
+            return None
+
+        adjusted_sections = []
+        for section in sections:
+            start_s = round(section["start_s"] + start_offset_s, 1)
+            end_s = round(section["end_s"] + start_offset_s, 1)
+            if total_duration_s is not None:
+                end_s = round(min(end_s, total_duration_s), 1)
+            adjusted_sections.append({
+                **section,
+                "start_s": start_s,
+                "end_s": max(start_s, end_s),
+            })
+        return adjusted_sections
     except Exception:
         return None
 
@@ -297,11 +514,12 @@ def analyze_section(y_section, sr, mode):
     if len(y_section) < sr * 3:
         return None
     try:
+        onset_env = librosa.onset.onset_strength(y=y_section, sr=sr)
         rms    = float(np.mean(librosa.feature.rms(y=y_section)[0]))
         energy = round(float(np.clip(rms * 10, 0, 1)), 3)
 
-        tempo_raw, _ = librosa.beat.beat_track(y=y_section, sr=sr)
-        tempo_s = float(np.atleast_1d(tempo_raw).flat[0])
+        tempo_info = estimate_tempo(y_section, sr, onset_env=onset_env)
+        tempo_s = tempo_info["tempo"]
 
         sc      = librosa.feature.spectral_contrast(y=y_section, sr=sr)
         sc_mean = float(np.mean(sc))
@@ -335,39 +553,70 @@ def analyze(filepath):
     duration = float(librosa.get_duration(y=y, sr=sr))
     result["duration_s"] = round(duration, 2)
 
-    if duration < MIN_DURATION:
-        return {"error": f"File too short ({duration:.1f}s). Minimum is {MIN_DURATION}s."}
+    y_analysis, trim_start_s, trim_end_s = trim_for_analysis(y, sr)
+    analysis_duration = float(librosa.get_duration(y=y_analysis, sr=sr))
+    trimmed_total = trim_start_s + trim_end_s
+    if trimmed_total >= 0.5:
+        result["trimmed_silence_s"] = round(trimmed_total, 2)
+        warnings_list.append(
+            f"Trimmed {trimmed_total:.1f}s of leading/trailing silence before analysis"
+        )
+
+    if analysis_duration < MIN_DURATION:
+        return {
+            "error": (
+                f"Usable audio too short after silence trimming ({analysis_duration:.1f}s). "
+                f"Minimum is {MIN_DURATION}s."
+            )
+        }
 
     # ── Tier 1 ───────────────────────────────────────────────────────────────
 
     # BPM
     try:
-        tempo_raw, _ = librosa.beat.beat_track(y=y, sr=sr)
-        tempo = round(float(np.atleast_1d(tempo_raw).flat[0]), 2)
-    except Exception:
+        tempo_info = estimate_tempo(y_analysis, sr)
+        tempo = tempo_info["tempo"]
+        onset_env = tempo_info["onset_env"]
+        beat_frames = tempo_info["beat_frames"]
+        result["tempo_confidence"] = tempo_info["confidence"]
+        result["tempo_candidates_bpm"] = tempo_info["candidates"]
+        if tempo_info["confidence"] < 0.5:
+            warnings_list.append(
+                f"Tempo estimate uncertain ({tempo_info['confidence']:.2f}) - half/double-time ambiguity possible"
+            )
+    except Exception as e:
         tempo = 120.0
-        warnings_list.append("BPM detection failed - using 120 BPM default")
+        onset_env = None
+        beat_frames = None
+        result["tempo_confidence"] = 0.0
+        result["tempo_candidates_bpm"] = [120.0]
+        warnings_list.append(f"BPM detection failed: {e}")
     result["tempo"] = tempo
 
     # Key + mode
     try:
-        key_idx, mode, ks_score = detect_key_mode(y, sr)
-        result.update({"key": key_idx, "key_name": KEY_NAMES[key_idx],
-                       "mode": mode, "mode_name": "major" if mode == 1 else "minor",
-                       "key_confidence": ks_score})
-        if ks_score < 0.7:
+        key_info = detect_key_mode(y_analysis, sr)
+        result.update(key_info)
+        if key_info["key_confidence"] < 0.55:
             warnings_list.append(
-                f"Key detection confidence low ({ks_score:.2f}) - "
+                f"Key detection confidence low ({key_info['key_confidence']:.2f}) - "
                 "song may be atonal or use complex modulation"
             )
+        elif key_info["key_alternatives"]:
+            alt = key_info["key_alternatives"][0]
+            if abs(key_info["key_correlation"] - alt["correlation"]) < 0.05:
+                warnings_list.append(
+                    f"Key estimate is close to {alt['key_name']} {alt['mode_name']} as well"
+                )
     except Exception as e:
         result.update({"key": 0, "key_name": "C", "mode": 1,
-                       "mode_name": "major", "key_confidence": 0.0})
+                       "mode_name": "major", "key_confidence": 0.0,
+                       "key_correlation": 0.0, "key_alternatives": []})
         warnings_list.append(f"Key detection failed: {e}")
 
     # Energy
     try:
-        rms    = librosa.feature.rms(y=y)[0]
+        rms    = librosa.feature.rms(y=y_analysis)[0]
         energy = round(float(np.clip(np.mean(rms) * 10, 0, 1)), 3)
     except Exception:
         energy = 0.5
@@ -376,7 +625,7 @@ def analyze(filepath):
 
     # Spectral contrast
     try:
-        sc      = librosa.feature.spectral_contrast(y=y, sr=sr, n_bands=6)
+        sc      = librosa.feature.spectral_contrast(y=y_analysis, sr=sr, n_bands=6)
         sc_mean = float(np.mean(sc))
     except Exception:
         sc_mean = 20.0
@@ -384,7 +633,7 @@ def analyze(filepath):
 
     # HNR
     try:
-        hnr_approx = compute_hnr_approx(y, sr)
+        hnr_approx = compute_hnr_approx(y_analysis, sr)
     except Exception:
         hnr_approx = 8.0
         warnings_list.append("HNR approximation failed")
@@ -392,7 +641,7 @@ def analyze(filepath):
 
     # Valence
     try:
-        valence = compute_valence_proxy(y, sr, result.get("mode", 1), sc_mean, hnr_approx)
+        valence = compute_valence_proxy(y_analysis, sr, result.get("mode", 1), sc_mean, hnr_approx)
     except Exception:
         valence = 0.5
         warnings_list.append("Valence estimation failed")
@@ -404,30 +653,30 @@ def analyze(filepath):
     result["arousal"] = round(float(np.clip(energy * 0.65 + tempo_norm * 0.35, 0, 1)), 3)
 
     try:
-        result.update(compute_temporal_features(y, sr))
+        result.update(compute_temporal_features(y_analysis, sr, onset_env=onset_env, beat_frames=beat_frames))
     except Exception as e:
         warnings_list.append(f"Temporal feature extraction failed: {e}")
 
     try:
-        result.update(compute_spectral_features(y, sr))
+        result.update(compute_spectral_features(y_analysis, sr))
     except Exception as e:
         warnings_list.append(f"Spectral feature extraction failed: {e}")
 
     # Acousticness
     try:
-        result["acousticness"] = compute_acousticness(y, sr)
+        result["acousticness"] = compute_acousticness(y_analysis, sr)
     except Exception:
         result["acousticness"] = 0.5
 
     # Danceability
     try:
-        result["danceability"] = compute_danceability(y, sr, tempo)
+        result["danceability"] = compute_danceability(y_analysis, sr, tempo, onset_env=onset_env)
     except Exception:
         result["danceability"] = 0.5
 
     # Speechiness
     try:
-        zcr = librosa.feature.zero_crossing_rate(y)[0]
+        zcr = librosa.feature.zero_crossing_rate(y_analysis)[0]
         result["speechiness"] = round(float(np.clip(np.mean(zcr) * 5, 0, 1)), 3)
     except Exception:
         result["speechiness"] = 0.1
@@ -435,7 +684,7 @@ def analyze(filepath):
     # Loudness
     result["loudness"] = result.get(
         "mean_loudness_db",
-        round(float(20 * np.log10(np.mean(np.abs(y)) + 1e-9)), 2),
+        round(float(20 * np.log10(np.mean(np.abs(y_analysis)) + 1e-9)), 2),
     )
 
     result["source"]           = "librosa"
@@ -474,14 +723,21 @@ def analyze(filepath):
             warnings_list.append(f"Demucs stem separation failed: {vocal_error}")
 
     # ── Tier 3: Section arc ───────────────────────────────────────────────────
-    sections = detect_sections(y, sr)
+    sections = detect_sections(
+        y_analysis,
+        sr,
+        start_offset_s=trim_start_s,
+        total_duration_s=duration,
+    )
     if sections:
         arc = []
         mode_val = result.get("mode", 1)
         for sec in sections:
-            s = int(sec["start_s"] * sr)
-            e = int(sec["end_s"]   * sr)
-            scores = analyze_section(y[s:e], sr, mode_val)
+            local_start = max(sec["start_s"] - trim_start_s, 0.0)
+            local_end = max(sec["end_s"] - trim_start_s, local_start)
+            s = int(local_start * sr)
+            e = int(local_end   * sr)
+            scores = analyze_section(y_analysis[s:e], sr, mode_val)
             if scores:
                 arc.append({**sec, **scores})
         if arc:
